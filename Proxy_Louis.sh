@@ -169,6 +169,11 @@ server {
     listen 443 ssl http2;
     server_name $DOMAIN;
 
+    # 添加根路径重定向
+    location = / {
+        return 301 https://\$host/web/index.html;
+    }
+
     ssl_certificate $SSL_CERT;
     ssl_certificate_key $SSL_KEY;
     ssl_session_timeout 1d;

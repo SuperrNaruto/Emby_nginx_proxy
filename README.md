@@ -1,6 +1,6 @@
 # Nginx Emby  一键反代指南
 
-### 此页脚本支持Emby前后端推流服务器不同域名后缀下的反向代理
+### 支持Emby前后端推流服务器 不同域名后缀 下的反向代理
 
 ### [单域名反向代理](https://github.com/xinyiiy/Emby_nginx_proxy/tree/main/sakullla)
 

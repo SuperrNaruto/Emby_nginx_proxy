@@ -2,7 +2,6 @@
 
 Github [@sakullla](https://github.com/sakullla) 
 
-- 这是关于Emby 推流服务器的反向代理配置
 - 支持单个域名的反向代理。支持 301 302 307的重定向代理
 - 支持 http1.1 \ http2 \ http3，ipv4 / ipv6 访问
 - 支持代理多个Emby服，每次只要根据模板调整和申请证书即可

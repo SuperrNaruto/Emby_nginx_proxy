@@ -1,6 +1,6 @@
 # Nginx Nmby 反代指南
 
-### Github [@sakullla](https://github.com/sakullla) 
+### 作者Github [@sakullla](https://github.com/sakullla/nginx-reverse-emby) 
 
 - 支持单个域名的反向代理。支持 301 302 307的重定向代理
 - 支持 http1.1 \ http2 \ http3，ipv4 / ipv6 访问

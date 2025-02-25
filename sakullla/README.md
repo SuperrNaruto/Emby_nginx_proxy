@@ -9,11 +9,11 @@
 
 # 一键部署脚本
 ```shell
-curl -sSL https://raw.githubusercontent.com/xinyiiy/Emby_nginx_proxy/refs/heads/main/sakullla/deploy.sh | bash -s -- -y yourdomain.com -r backend.com
+curl -sSL https://raw.githubusercontent.com/xiyiLy/Emby_nginx_proxy/refs/heads/main/sakullla/deploy.sh | bash -s -- -y yourdomain.com -r backend.com
 ```
 或者交互式
 ```shell
-bash <(curl -sSL https://raw.githubusercontent.com/xinyiiy/Emby_nginx_proxy/refs/heads/main/sakullla/deploy.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/xiyiLy/Emby_nginx_proxy/refs/heads/main/sakullla/deploy.sh)
 ```
 
 

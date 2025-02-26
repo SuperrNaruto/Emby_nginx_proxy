@@ -207,7 +207,7 @@ fi
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/sakullla/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/yily/nginx.conf
 
 # 为每个输入的域名生成独立的配置文件
 for r_domain in "${all_domains[@]}"; do
@@ -223,7 +223,7 @@ for r_domain in "${all_domains[@]}"; do
     # 下载并创建配置文件，以域名命名文件
     config_file="${you_domain}_${r_domain//./_}.conf"
     echo "下载并创建 $config_file 配置文件..."
-    curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
+    curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/yily/conf.d/$download_domain_config.conf"
 
     # 如果 you_frontend_port 不为空，则替换端口
     if [[ -n "$you_frontend_port" ]]; then

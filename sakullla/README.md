@@ -1,4 +1,4 @@
-# Nginx Nmby 反代指南
+# Nginx Emby 反代指南
 
 ### 作者Github [@sakullla](https://github.com/sakullla/nginx-reverse-emby) 
 

@@ -257,7 +257,7 @@ for r_domain in "${all_domains[@]}"; do
         # 提取 HTTP 部分，删除 HTTPS 部分
         sed -i '/# HTTPS Server Block (Port 443)/,/}/d' "$config_file"
     else
-        # 更新 SSL 证书路径
+        # 更新 SSL 证书路径为当前域名（you_domain）
         sed -i "s|/etc/nginx/certs/p.example.com/cert|/etc/nginx/certs/$you_domain/cert|g" "$config_file"
         sed -i "s|/etc/nginx/certs/p.example.com/key|/etc/nginx/certs/$you_domain/key|g" "$config_file"
     fi
@@ -271,7 +271,7 @@ for r_domain in "${all_domains[@]}"; do
     fi
 done
 
-# TLS 配置
+# TLS 配置（仅为 you_domain 生成证书）
 if [[ "$no_tls" != "yes" ]]; then
     ACME_SH="$HOME/.acme.sh/acme.sh"
 

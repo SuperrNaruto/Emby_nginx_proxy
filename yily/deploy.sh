@@ -207,7 +207,7 @@ fi
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/yily/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/sakullla/nginx.conf
 
 # 在 for 循环中生成支持 HTTP 和 HTTPS 的配置文件
 for r_domain in "${all_domains[@]}"; do
@@ -220,13 +220,13 @@ for r_domain in "${all_domains[@]}"; do
         download_domain_config="p.example.com.no_tls"
     else
         # 使用支持 HTTP 和 HTTPS 的模板
-        download_domain_config="p.example.com.both"  # 假设有一个新的模板文件支持两者
+        download_domain_config="p.example.com.both"
     fi
 
     # 下载并创建配置文件，以域名命名文件
     config_file="${you_domain}_${r_domain//./_}.conf"
     echo "下载并创建 $config_file 配置文件..."
-    curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/yily/conf.d/$download_domain_config.conf"
+    curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
 
     # 替换 server_name 为当前域名
     sed -i "s/p.example.com/$r_domain/g" "$config_file"
@@ -261,6 +261,11 @@ for r_domain in "${all_domains[@]}"; do
         sed -i "s|/etc/nginx/certs/p.example.com/key|/etc/nginx/certs/$r_domain/key|g" "$config_file"
     fi
 
+    # 确保 .well-known/acme-challenge 路径在 HTTP 块中可用
+    if [[ "$no_tls" != "yes" ]]; then
+        sed -i "/listen 80;/a\        location /.well-known/acme-challenge/ {\n            root /var/www/html;\n            default_type text/plain;\n        }" "$config_file"
+    fi
+
     # 移动配置文件到 /etc/nginx/conf.d/
     echo "移动 $config_file 到 /etc/nginx/conf.d/"
     if [[ "$OS_NAME" == "ubuntu" ]]; then
@@ -290,7 +295,8 @@ if [[ "$no_tls" != "yes" ]]; then
     domain_list=$(printf " -d %s" "${domains[@]}")
     if ! "$ACME_SH" --info $domain_list | grep -q RealFullChainPath; then
         echo "ECC 证书未申请，正在申请..."
-        mkdir -p "/etc/nginx/certs/$you_domain"
+        mkdir -p "/var/www/html/.well-known/acme-challenge"  # Ensure challenge directory exists
+        sudo chmod -R 755 /var/www/html
         "$ACME_SH" --issue $domain_list --standalone --keylength ec-256 || {
             echo "证书申请失败，请检查错误信息！"
             for r_domain in "${all_domains[@]}"; do

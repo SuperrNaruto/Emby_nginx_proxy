@@ -209,18 +209,15 @@ fi
 echo "下载并复制 nginx 配置文件..."
 curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/sakullla/nginx.conf
 
-# 在 for 循环中生成支持 HTTP 和 HTTPS 的配置文件
+# 为每个输入的域名生成独立的配置文件（包含 HTTP 和 HTTPS）
 for r_domain in "${all_domains[@]}"; do
     you_domain_config="$you_domain"
     download_domain_config="p.example.com"
 
-    # 如果 $no_tls 选择使用 HTTP，则只生成 HTTP 配置
+    # 如果 $no_tls 选择使用 HTTP，则选择下载对应的模板
     if [[ "$no_tls" == "yes" ]]; then
         you_domain_config="$you_domain.$you_frontend_port"
         download_domain_config="p.example.com.no_tls"
-    else
-        # 使用支持 HTTP 和 HTTPS 的模板
-        download_domain_config="p.example.com.both"
     fi
 
     # 下载并创建配置文件，以域名命名文件
@@ -231,39 +228,38 @@ for r_domain in "${all_domains[@]}"; do
     # 替换 server_name 为当前域名
     sed -i "s/p.example.com/$r_domain/g" "$config_file"
 
-    # 替换 emby.example.com 为当前域名
+    # 如果 you_frontend_port 不为空，则替换端口（HTTPS 部分）
+    if [[ -n "$you_frontend_port" && "$no_tls" != "yes" ]]; then
+        sed -i "s/443 ssl http2/$you_frontend_port ssl http2/g" "$config_file"
+        sed -i "s/443 ssl/$you_frontend_port ssl/g" "$config_file"
+    fi
+
+    # 如果 r_http_frontend 选择使用 HTTP，前端域名应用（仅 HTTP 部分）
+    if [[ "$r_http_frontend" == "yes" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
+        sed -i "s/https:\/\/emby.example.com/http:\/\/emby.example.com/g" "$config_file"
+    fi
+
+    # 如果 r_frontend_port 不为空，修改 emby.example.com 加上端口（仅前端域名，HTTP 和 HTTPS）
+    if [[ -n "$r_frontend_port" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
+        sed -i "s/emby.example.com/emby.example.com:$r_frontend_port/g" "$config_file"
+    fi
+
+    # 替换 emby.example.com 为当前域名（HTTP 和 HTTPS）
     sed -i "s/emby.example.com/$r_domain/g" "$config_file"
 
-    # 如果 you_frontend_port 不为空，则替换端口
-    if [[ -n "$you_frontend_port" ]]; then
-        sed -i "s/443/$you_frontend_port/g" "$config_file"
-        sed -i "s/80/$you_frontend_port/g" "$config_file"  # 如果 HTTP 也使用自定义端口
-    fi
-
-    # 如果 r_http_frontend 选择使用 HTTP，前端域名应用
-    if [[ "$r_http_frontend" == "yes" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
-        sed -i "s/https:\/\/frontend.com/http:\/\/frontend.com/g" "$config_file"
-    fi
-
-    # 如果 r_frontend_port 不为空，修改前端域名加上端口
-    if [[ -n "$r_frontend_port" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
-        sed -i "s/frontend.com/frontend.com:$r_frontend_port/g" "$config_file"
-    fi
-
-    # 如果 r_http_backend 选择使用 HTTP，后端域名应用
+    # 如果 r_http_backend 选择使用 HTTP，后端域名应用（HTTP 和 HTTPS 部分）
     if [[ "$r_http_backend" == "yes" && " ${backend_domains[*]} " =~ " $r_domain " ]]; then
         sed -i "s/https:\/\/\$website/http:\/\/\$website/g" "$config_file"
     fi
 
-    # 更新 SSL 证书路径（如果有多个域名，可能需要通配符证书或多个证书）
-    if [[ "$no_tls" != "yes" ]]; then
-        sed -i "s|/etc/nginx/certs/p.example.com/cert|/etc/nginx/certs/$r_domain/cert|g" "$config_file"
-        sed -i "s|/etc/nginx/certs/p.example.com/key|/etc/nginx/certs/$r_domain/key|g" "$config_file"
-    fi
-
-    # 确保 .well-known/acme-challenge 路径在 HTTP 块中可用
-    if [[ "$no_tls" != "yes" ]]; then
-        sed -i "/listen 80;/a\        location /.well-known/acme-challenge/ {\n            root /var/www/html;\n            default_type text/plain;\n        }" "$config_file"
+    # 如果禁用 TLS，移除 HTTPS 部分或调整为仅 HTTP
+    if [[ "$no_tls" == "yes" ]]; then
+        # 提取 HTTP 部分，删除 HTTPS 部分
+        sed -i '/# HTTPS Server Block (Port 443)/,/}/d' "$config_file"
+    else
+        # 更新 SSL 证书路径
+        sed -i "s|/etc/nginx/certs/p.example.com/cert|/etc/nginx/certs/$you_domain/cert|g" "$config_file"
+        sed -i "s|/etc/nginx/certs/p.example.com/key|/etc/nginx/certs/$you_domain/key|g" "$config_file"
     fi
 
     # 移动配置文件到 /etc/nginx/conf.d/
@@ -290,14 +286,10 @@ if [[ "$no_tls" != "yes" ]]; then
         echo "acme.sh 已安装，跳过安装步骤。"
     fi
 
-    # 为所有域名申请证书
-    domains=("$you_domain" "${r_domain_array[@]}" "${backend_domains[@]}")
-    domain_list=$(printf " -d %s" "${domains[@]}")
-    if ! "$ACME_SH" --info $domain_list | grep -q RealFullChainPath; then
+    if ! "$ACME_SH" --info -d "$you_domain" | grep -q RealFullChainPath; then
         echo "ECC 证书未申请，正在申请..."
-        mkdir -p "/var/www/html/.well-known/acme-challenge"  # Ensure challenge directory exists
-        sudo chmod -R 755 /var/www/html
-        "$ACME_SH" --issue $domain_list --standalone --keylength ec-256 || {
+        mkdir -p "/etc/nginx/certs/$you_domain"
+        "$ACME_SH" --issue -d "$you_domain" --standalone --keylength ec-256 || {
             echo "证书申请失败，请检查错误信息！"
             for r_domain in "${all_domains[@]}"; do
                 rm -f "/etc/nginx/conf.d/${you_domain}_${r_domain//./_}.conf"
@@ -308,7 +300,6 @@ if [[ "$no_tls" != "yes" ]]; then
         echo "ECC 证书已申请，跳过申请步骤。"
     fi
 
-    # 安装证书（这里假设为第一个域名安装，如果需要为每个域名安装证书，需循环处理）
     echo "安装证书..."
     "$ACME_SH" --install-cert -d "$you_domain" --ecc \
         --fullchain-file "/etc/nginx/certs/$you_domain/cert" \

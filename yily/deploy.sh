@@ -227,10 +227,11 @@ for r_domain in "${all_domains[@]}"; do
         sed -i "s/https:\/\/\$website/http:\/\/\$website/g" "$config_file"
     fi
 
-    # 如果使用 TLS，添加证书路径 (兼容 QUIC 配置)
-    if [[ "$no_tls" != "yes" ]]; then
-        sed -i "/server_name.*$/a ssl_certificate /etc/nginx/certs/$you_domain/cert;\nssl_certificate_key /etc/nginx/certs/$you_domain/key;" "$config_file"
-    fi
+   # 如果使用 TLS，添加证书路径 (兼容 QUIC 配置)
+if [[ "$no_tls" != "yes" ]]; then
+    # Ensure certificates are added within the server block, after "server {" and before other directives
+    sed -i "/^server {/,/}/ s|^server {|server {\n    ssl_certificate /etc/nginx/certs/$you_domain/cert;\n    ssl_certificate_key /etc/nginx/certs/$you_domain/key;|" "$config_file"
+fi
 
     # 移动配置文件
     echo "移动 $config_file 到 /etc/nginx/conf.d/"

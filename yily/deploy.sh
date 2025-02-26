@@ -9,7 +9,7 @@ show_help() {
 
 选项:
   -y, --you-domain <域名>        你的域名或IP (例如: example.com)
-  -r, --r-domain <域名>          反代 Emby 的域名 (前端域名，例如: frontend.com)
+  -r, --r-domain <域名>          反代 Emby 的前端域名 (例如: frontend.com)
   -P, --you-frontend-port <端口>  你的前端访问端口 (默认: 443)
   -p, --r-frontend-port <端口>    反代 Emby 前端端口 (默认: 空)
   -f, --r-http-frontend          反代 Emby 使用 HTTP 作为前端访问 (默认: 否)
@@ -22,9 +22,9 @@ EOF
 
 # 初始化变量
 you_domain=""
-r_domain_frontend=""  # Changed to single frontend domain
-stream_count=""       # New variable for streaming server count
-r_http_backend_stream="no"  # New variable for HTTP backend streaming
+r_frontend_domain=""  # Changed to single frontend domain
+stream_count=""       # New variable for stream count
+r_backend_domains=""  # New variable for backend streaming servers
 you_frontend_port="443"
 r_frontend_port=""
 r_http_backend="no"
@@ -44,7 +44,7 @@ eval set -- "$TEMP"
 while true; do
     case "$1" in
         -y|--you-domain) you_domain="$2"; shift 2 ;;
-        -r|--r-domain) r_domain_frontend="$2"; shift 2 ;;  # Only frontend domain
+        -r|--r-domain) r_frontend_domain="$2"; shift 2 ;;  # Only frontend domain here
         -P|--you-frontend-port) you_frontend_port="$2"; shift 2 ;;
         -p|--r-frontend-port) r_frontend_port="$2"; shift 2 ;;
         -b|--r-http-backend) r_http_backend="yes"; shift ;;
@@ -57,30 +57,33 @@ while true; do
 done
 
 # 交互模式 (如果未提供必要参数)
-if [[ -z "$you_domain" || -z "$r_domain_frontend" ]]; then
+if [[ -z "$you_domain" || -z "$r_frontend_domain" ]]; then
     echo -e "\n--- 交互模式: 配置反向代理 ---"
     echo "请按提示输入参数，或直接按 Enter 使用默认值"
     read -p "你的域名或者 IP [默认: you.example.com]: " input_you_domain
-    read -p "反代Emby的域名 (前端) [默认: frontend.example.com]: " input_r_domain_frontend
-    read -p "推流数量 (Emby后端流式处理服务器数量) [默认: 1]: " input_stream_count
-    read -p "是否使用HTTP反向代理Emby后端流式服务器? (yes/no) [默认: no]: " input_r_http_backend_stream
+    read -p "反代 Emby 的域名 (前端) [默认: frontend.example.com]: " input_r_frontend_domain
+    read -p "推流数量 [默认: 1]: " input_stream_count
+    read -p "Emby 后端流式处理服务器 (多个域名用逗号分隔，例如: backend1.com,backend2.com) [默认: backend.example.com]: " input_r_backend_domains
+    read -p "是否使用HTTP反向代理后端流式处理服务器? (yes/no) [默认: no]: " input_r_http_backend
     read -p "你的前端访问端口 [默认: 443]: " input_you_frontend_port
-    read -p "反代Emby前端端口 [默认: 空]: " input_r_frontend_port
-    read -p "是否使用HTTP连接反代Emby后端? (yes/no) [默认: no]: " input_r_http_backend
-    read -p "是否使用HTTP连接反代Emby前端? (yes/no) [默认: no]: " input_r_http_frontend
+    read -p "反代 Emby 前端端口 [默认: 空]: " input_r_frontend_port
+    read -p "是否使用HTTP连接反代 Emby 前端? (yes/no) [默认: no]: " input_r_http_frontend
     read -p "是否禁用TLS? (yes/no) [默认: no]: " input_no_tls
 
     # 赋值默认值
     you_domain="${input_you_domain:-you.example.com}"
-    r_domain_frontend="${input_r_domain_frontend:-frontend.example.com}"
+    r_frontend_domain="${input_r_frontend_domain:-frontend.example.com}"
     stream_count="${input_stream_count:-1}"
-    r_http_backend_stream="${input_r_http_backend_stream:-no}"
+    r_backend_domains="${input_r_backend_domains:-backend.example.com}"
+    r_http_backend="${input_r_http_backend:-no}"
     you_frontend_port="${input_you_frontend_port:-443}"
     r_frontend_port="${input_r_frontend_port}"
-    r_http_backend="${input_r_http_backend:-no}"
     r_http_frontend="${input_r_http_frontend:-no}"
     no_tls="${input_no_tls:-no}"
 fi
+
+# Split r_backend_domains into an array (for display purposes only, not for config generation)
+IFS=',' read -r -a r_backend_domain_array <<< "$r_backend_domains"
 
 # 美化输出配置信息
 protocol=$( [[ "$no_tls" == "yes" ]] && echo "http" || echo "https" )
@@ -90,11 +93,11 @@ echo -e "\n------ 配置信息 ------"
 echo "🌍 访问地址: ${url}"
 echo "📌 你的域名: ${you_domain}"
 echo "🖥️  你的前端访问端口: ${you_frontend_port}"
-echo "🔄 反代 Emby 的前端域名: ${r_domain_frontend}"
-echo "📡 推流数量 (Emby后端服务器): ${stream_count}"
-echo "🌐 是否使用HTTP反向代理Emby后端流式服务器: $( [[ "$r_http_backend_stream" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
+echo "🔄 反代 Emby 的前端域名: ${r_frontend_domain}"
+echo "📡 推流数量: ${stream_count}"
+echo "🖧 Emby 后端流式处理服务器: ${r_backend_domains}"
 echo "🎯 反代 Emby 前端端口: ${r_frontend_port:-未指定}"
-echo "🔗 使用 HTTP 连接反代 Emby 后端: $( [[ "$r_http_backend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
+echo "🔗 使用 HTTP 反向代理后端流式处理服务器: $( [[ "$r_http_backend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 echo "🛠️  使用 HTTP 连接反代 Emby 前端: $( [[ "$r_http_frontend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 echo "🔒 禁用 TLS: $( [[ "$no_tls" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 echo "----------------------"
@@ -184,9 +187,9 @@ fi
 
 # 下载并复制 nginx.conf (保持不变)
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/xinyily/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/sakullla/nginx.conf
 
-# 生成单个配置文件
+# 只为前端域名生成配置文件
 you_domain_config="$you_domain"
 download_domain_config="p.example.com"
 
@@ -199,7 +202,7 @@ fi
 # 下载并创建配置文件
 config_file="${you_domain}.conf"
 echo "下载并创建 $config_file 配置文件..."
-curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/xinyily/conf.d/$download_domain_config.conf"
+curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
 
 # 如果 you_frontend_port 不为空，则替换端口
 if [[ -n "$you_frontend_port" ]]; then
@@ -218,19 +221,12 @@ fi
 
 # 替换前端域名信息
 sed -i "s/p.example.com/$you_domain/g" "$config_file"
-sed -i "s/emby.example.com/$r_domain_frontend/g" "$config_file"
+sed -i "s/emby.example.com/$r_frontend_domain/g" "$config_file"
 
-# 如果 r_http_backend_stream 选择使用 HTTP，替换 https://$website
-if [[ "$r_http_backend_stream" == "yes" ]]; then
+# 如果 r_http_backend 选择使用 HTTP，替换 https://$website
+if [[ "$r_http_backend" == "yes" ]]; then
     sed -i "s/https:\/\/\$website/http:\/\/\$website/g" "$config_file"
 fi
-
-# 根据推流数量动态调整配置文件（假设后端域名基于前端域名生成）
-for ((i=1; i<=stream_count; i++)); do
-    backend_domain="stream${i}.${r_domain_frontend}"
-    echo "添加后端流式服务器: $backend_domain"
-    # 这里假设 Nginx 配置中 /backstream/ 已能处理动态域名，无需额外生成文件
-done
 
 # 移动配置文件到 /etc/nginx/conf.d/
 echo "移动 $config_file 到 /etc/nginx/conf.d/"
@@ -258,7 +254,7 @@ if [[ "$no_tls" != "yes" ]]; then
 
     # 申请并安装 ECC 证书
     if ! "$ACME_SH" --info -d "$you_domain" | grep -q RealFullChainPath; then
-        echo "ECC 证书未申请，正在安装..."
+        echo "ECC 证书未申请，正在申请..."
         mkdir -p "/etc/nginx/certs/$you_domain"
 
         "$ACME_SH" --issue -d "$you_domain" --standalone --keylength ec-256 || {

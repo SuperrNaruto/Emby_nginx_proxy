@@ -22,9 +22,9 @@ EOF
 
 # 初始化变量
 you_domain=""
-r_domains=""  # For frontend domain(s)
-backend_count=""  # Number of backend servers, empty by default
-backend_domains=()  # Array for backend domains
+r_domains=""
+backend_count=0
+backend_domains=()
 r_http_backend="no"
 you_frontend_port="443"
 r_frontend_port=""
@@ -56,41 +56,37 @@ while true; do
     esac
 done
 
-# 交互模式 (如果未提供必要参数)
+# 交互模式
 if [[ -z "$you_domain" || -z "$r_domains" ]]; then
     echo -e "\n--- 交互模式: 配置反向代理 ---"
     echo "请按提示输入参数，或直接按 Enter 使用默认值"
     read -p "你的域名或者 IP [默认: you.example.com]: " input_you_domain
     read -p "反代Emby的域名 (前端，例如: frontend.com) [默认: r.example.com]: " input_r_domains
+    read -p "推流数量 (Emby后端流式处理服务器数量，输入0或留空跳过) [默认: 0]: " input_backend_count
 
-    # 赋值前端域名
     you_domain="${input_you_domain:-you.example.com}"
     r_domains="${input_r_domains:-r.example.com}"
+    backend_count="${input_backend_count:-0}"
 
-    # 提示输入推流数量
-    read -p "推流数量 (Emby后端流式处理服务器数量，若不输入则跳过) [默认: 空]: " input_backend_count
-    if [[ -n "$input_backend_count" ]]; then
-        backend_count="$input_backend_count"
-        # 根据推流数量提示用户输入后端域名
+    if [[ "$backend_count" -gt 0 ]]; then
+        echo "请输入 $backend_count 个 Emby 后端流式处理服务器地址："
         for ((i=1; i<=backend_count; i++)); do
-            read -p "请输入第 $i 个 Emby 后端流式处理服务器地址 (例如: backend$i.example.com): " backend_domain
-            if [[ -n "$backend_domain" ]]; then
-                backend_domains+=("$backend_domain")
+            read -p "后端服务器 $i 地址 (例如: backend$i.example.com): " backend_input
+            if [[ -n "$backend_input" ]]; then
+                backend_domains+=("$backend_input")
             else
-                backend_domains+=("backend$i.${r_domains%%,*}")  # Default to subdomain of first frontend domain
+                backend_domains+=("backend$i.${r_domains%%,*}")
             fi
         done
         read -p "是否使用HTTP反向代理Emby后端? (yes/no) [默认: no]: " input_r_http_backend
         r_http_backend="${input_r_http_backend:-no}"
     fi
 
-    # 继续其他参数
     read -p "你的前端访问端口 [默认: 443]: " input_you_frontend_port
     read -p "反代Emby前端端口 [默认: 空]: " input_r_frontend_port
     read -p "是否使用HTTP连接反代Emby前端? (yes/no) [默认: no]: " input_r_http_frontend
     read -p "是否禁用TLS? (yes/no) [默认: no]: " input_no_tls
 
-    # 赋值默认值
     you_frontend_port="${input_you_frontend_port:-443}"
     r_frontend_port="${input_r_frontend_port}"
     r_http_frontend="${input_r_http_frontend:-no}"
@@ -112,8 +108,8 @@ echo "🌍 访问地址: ${url}"
 echo "📌 你的域名: ${you_domain}"
 echo "🖥️  你的前端访问端口: ${you_frontend_port}"
 echo "🔄 反代 Emby 的前端域名: ${r_domains}"
-if [[ ${#backend_domains[@]} -gt 0 ]]; then
-    echo "🔄 推流数量 (Emby后端服务器): ${backend_count}"
+echo "🔄 推流数量 (Emby后端服务器): ${backend_count}"
+if [[ "$backend_count" -gt 0 ]]; then
     echo "🔄 反代 Emby 的后端域名: ${backend_domains[*]}"
     echo "🔗 使用 HTTP 连接反代 Emby 后端: $( [[ "$r_http_backend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 fi
@@ -122,7 +118,7 @@ echo "🛠️  使用 HTTP 连接反代 Emby 前端: $( [[ "$r_http_frontend" ==
 echo "🔒 禁用 TLS: $( [[ "$no_tls" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 echo "----------------------"
 
-# 检查依赖函数保持不变
+# 检查依赖函数
 check_dependencies() {
   if [[ ! -f '/etc/os-release' ]]; then
     echo "error: Don't use outdated Linux distributions."
@@ -135,32 +131,12 @@ check_dependencies() {
   fi
 
   case "$ID" in
-  debian|devuan|kali)
-      OS_NAME='debian'
-      PM='apt'
-      GNUPG_PM='gnupg2'
-      ;;
-  ubuntu)
-      OS_NAME='ubuntu'
-      PM='apt'
-      GNUPG_PM=$([[ ${VERSION_ID%%.*} -lt 22 ]] && echo "gnupg2" || echo "gnupg")
-      ;;
-  centos|fedora|rhel|almalinux|rocky|amzn)
-      OS_NAME='rhel'
-      PM=$(command -v dnf >/dev/null && echo "dnf" || echo "yum")
-      ;;
-  arch|archarm)
-      OS_NAME='arch'
-      PM='pacman'
-      ;;
-  alpine)
-      OS_NAME='alpine'
-      PM='apk'
-      ;;
-  *)
-      OS_NAME="$ID"
-      PM='apt'
-      ;;
+  debian|devuan|kali) OS_NAME='debian'; PM='apt'; GNUPG_PM='gnupg2'; ;;
+  ubuntu) OS_NAME='ubuntu'; PM='apt'; GNUPG_PM=$([[ ${VERSION_ID%%.*} -lt 22 ]] && echo "gnupg2" || echo "gnupg"); ;;
+  centos|fedora|rhel|almalinux|rocky|amzn) OS_NAME='rhel'; PM=$(command -v dnf >/dev/null && echo "dnf" || echo "yum"); ;;
+  arch|archarm) OS_NAME='arch'; PM='pacman'; ;;
+  alpine) OS_NAME='alpine'; PM='apk'; ;;
+  *) OS_NAME="$ID"; PM='apt'; ;;
   esac
 }
 check_dependencies
@@ -209,60 +185,53 @@ fi
 echo "下载并复制 nginx 配置文件..."
 curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/sakullla/nginx.conf
 
-# 为每个输入的域名生成独立的配置文件（包含 HTTP 和 HTTPS）
+# 为每个域名生成配置文件
 for r_domain in "${all_domains[@]}"; do
     you_domain_config="$you_domain"
     download_domain_config="p.example.com"
 
-    # 如果 $no_tls 选择使用 HTTP，则选择下载对应的模板
     if [[ "$no_tls" == "yes" ]]; then
         you_domain_config="$you_domain.$you_frontend_port"
         download_domain_config="p.example.com.no_tls"
+    else
+        # Assume QUIC-enabled template for TLS case
+        download_domain_config="p.example.com"  # Adjust if a QUIC-specific template exists
     fi
 
-    # 下载并创建配置文件，以域名命名文件
     config_file="${you_domain}_${r_domain//./_}.conf"
     echo "下载并创建 $config_file 配置文件..."
     curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
 
-    # 替换 server_name 为当前域名
-    sed -i "s/p.example.com/$r_domain/g" "$config_file"
-
-    # 如果 you_frontend_port 不为空，则替换端口（HTTPS 部分）
-    if [[ -n "$you_frontend_port" && "$no_tls" != "yes" ]]; then
-        sed -i "s/443 ssl http2/$you_frontend_port ssl http2/g" "$config_file"
-        sed -i "s/443 ssl/$you_frontend_port ssl/g" "$config_file"
+    # 替换端口
+    if [[ -n "$you_frontend_port" ]]; then
+        sed -i "s/443/$you_frontend_port/g" "$config_file"
     fi
 
-    # 如果 r_http_frontend 选择使用 HTTP，前端域名应用（仅 HTTP 部分）
+    # 前端 HTTP 设置
     if [[ "$r_http_frontend" == "yes" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
         sed -i "s/https:\/\/emby.example.com/http:\/\/emby.example.com/g" "$config_file"
     fi
 
-    # 如果 r_frontend_port 不为空，修改 emby.example.com 加上端口（仅前端域名，HTTP 和 HTTPS）
+    # 前端端口设置
     if [[ -n "$r_frontend_port" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
         sed -i "s/emby.example.com/emby.example.com:$r_frontend_port/g" "$config_file"
     fi
 
-    # 替换 emby.example.com 为当前域名（HTTP 和 HTTPS）
+    # 替换域名
+    sed -i "s/p.example.com/$you_domain/g" "$config_file"
     sed -i "s/emby.example.com/$r_domain/g" "$config_file"
 
-    # 如果 r_http_backend 选择使用 HTTP，后端域名应用（HTTP 和 HTTPS 部分）
+    # 后端 HTTP 设置
     if [[ "$r_http_backend" == "yes" && " ${backend_domains[*]} " =~ " $r_domain " ]]; then
         sed -i "s/https:\/\/\$website/http:\/\/\$website/g" "$config_file"
     fi
 
-    # 如果禁用 TLS，移除 HTTPS 部分或调整为仅 HTTP
-    if [[ "$no_tls" == "yes" ]]; then
-        # 提取 HTTP 部分，删除 HTTPS 部分
-        sed -i '/# HTTPS Server Block (Port 443)/,/}/d' "$config_file"
-    else
-        # 更新 SSL 证书路径为当前域名（you_domain）
-        sed -i "s|/etc/nginx/certs/p.example.com/cert|/etc/nginx/certs/$you_domain/cert|g" "$config_file"
-        sed -i "s|/etc/nginx/certs/p.example.com/key|/etc/nginx/certs/$you_domain/key|g" "$config_file"
+    # 如果使用 TLS，添加证书路径 (兼容 QUIC 配置)
+    if [[ "$no_tls" != "yes" ]]; then
+        sed -i "/server_name.*$/a ssl_certificate /etc/nginx/certs/$you_domain/cert;\nssl_certificate_key /etc/nginx/certs/$you_domain/key;" "$config_file"
     fi
 
-    # 移动配置文件到 /etc/nginx/conf.d/
+    # 移动配置文件
     echo "移动 $config_file 到 /etc/nginx/conf.d/"
     if [[ "$OS_NAME" == "ubuntu" ]]; then
         rsync -av "$config_file" /etc/nginx/conf.d/
@@ -271,7 +240,7 @@ for r_domain in "${all_domains[@]}"; do
     fi
 done
 
-# TLS 配置（仅为 you_domain 生成证书）
+# TLS 配置
 if [[ "$no_tls" != "yes" ]]; then
     ACME_SH="$HOME/.acme.sh/acme.sh"
 

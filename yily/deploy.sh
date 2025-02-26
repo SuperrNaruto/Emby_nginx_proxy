@@ -241,11 +241,8 @@ for r_domain in "${all_domains[@]}"; do
 done
 
 # TLS 配置
-# 如果使用 TLS，添加证书路径 (兼容 QUIC 配置)
 if [[ "$no_tls" != "yes" ]]; then
-    # Ensure certificates are added within the server block, after "server {" and before other directives
-    sed -i "/^server {/,/}/ s|^server {|server {\n    ssl_certificate /etc/nginx/certs/$you_domain/cert;\n    ssl_certificate_key /etc/nginx/certs/$you_domain/key;|" "$config_file"
-fi
+    ACME_SH="$HOME/.acme.sh/acme.sh"
 
     echo "检查 acme.sh 是否已安装..."
     if [[ ! -f "$ACME_SH" ]]; then

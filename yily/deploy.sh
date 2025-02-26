@@ -267,7 +267,7 @@ if [[ "$no_tls" != "yes" ]]; then
         "$ACME_SH" --issue -d "$you_domain" --standalone --keylength ec-256 || {
             echo "证书申请失败，请检查错误信息！"
             for r_domain in "${all_domains[@]}"; do
-                rm -f "/etc/nginx/conf.d/${you_domain}_${r_domain//./_}.conf"
+                rm -f "/etc/nginx/conf.d/${you_domain}.conf"
             done
             exit 1
         }

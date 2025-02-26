@@ -196,10 +196,12 @@ for r_domain in "${all_domains[@]}"; do
         download_domain_config="p.example.com.no_tls"
     else
         # Assume QUIC-enabled template for TLS case
-        download_domain_config="p.example.com"  # Adjust if a QUIC-specific template exists
+        download_domain_config="p.example.com"
     fi
 
-    config_file="${you_domain}_${r_domain//./_}.conf"
+    # Generate a unique server_name for each domain (combine you_domain and r_domain)
+    unique_server_name="${you_domain}_${r_domain//./_}"
+    config_file="${unique_server_name}.conf"
     echo "下载并创建 $config_file 配置文件..."
     curl -o "$config_file" "https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
 
@@ -207,6 +209,9 @@ for r_domain in "${all_domains[@]}"; do
     if [[ -n "$you_frontend_port" ]]; then
         sed -i "s/443/$you_frontend_port/g" "$config_file"
     fi
+
+    # 替换 server_name with unique value
+    sed -i "s/p.example.com/$unique_server_name/g" "$config_file"
 
     # 前端 HTTP 设置
     if [[ "$r_http_frontend" == "yes" && " ${r_domain_array[*]} " =~ " $r_domain " ]]; then
@@ -219,7 +224,6 @@ for r_domain in "${all_domains[@]}"; do
     fi
 
     # 替换域名
-    sed -i "s/p.example.com/$you_domain/g" "$config_file"
     sed -i "s/emby.example.com/$r_domain/g" "$config_file"
 
     # 后端 HTTP 设置
@@ -227,11 +231,11 @@ for r_domain in "${all_domains[@]}"; do
         sed -i "s/https:\/\/\$website/http:\/\/\$website/g" "$config_file"
     fi
 
-   # 如果使用 TLS，添加证书路径 (兼容 QUIC 配置)
-if [[ "$no_tls" != "yes" ]]; then
-    # Ensure certificates are added within the server block, after "server {" and before other directives
-    sed -i "/^server {/,/}/ s|^server {|server {\n    ssl_certificate /etc/nginx/certs/$you_domain/cert;\n    ssl_certificate_key /etc/nginx/certs/$you_domain/key;|" "$config_file"
-fi
+    # 如果使用 TLS，添加证书路径 (兼容 QUIC 配置)
+    if [[ "$no_tls" != "yes" ]]; then
+        # Ensure certificates are added within the server block
+        sed -i "/^server {/,/}/ s|^server {|server {\n    ssl_certificate /etc/nginx/certs/$you_domain/cert;\n    ssl_certificate_key /etc/nginx/certs/$you_domain/key;|" "$config_file"
+    fi
 
     # 移动配置文件
     echo "移动 $config_file 到 /etc/nginx/conf.d/"

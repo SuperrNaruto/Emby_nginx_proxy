@@ -266,8 +266,7 @@ if [[ "$no_tls" != "yes" ]]; then
         mkdir -p "/etc/nginx/certs/$you_domain"
         "$ACME_SH" --issue -d "$you_domain" --standalone --keylength ec-256 || {
             echo "证书申请失败，请检查错误信息！"
-            for r_domain in "${all_domains[@]}"; do
-                rm -f "/etc/nginx/conf.d/${you_domain}.conf"
+                rm -f "/etc/nginx/conf.d/$you_domain.conf"
             done
             exit 1
         }

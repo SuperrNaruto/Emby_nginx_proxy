@@ -93,6 +93,7 @@ echo "----------------------"
 
 
 check_dependencies() {
+
   if [[ ! -f '/etc/os-release' ]]; then
     echo "error: Don't use outdated Linux distributions."
     return 1
@@ -173,6 +174,7 @@ if ! command -v nginx &> /dev/null; then
 else
     echo "Nginx 已安装，跳过安装步骤。"
 fi
+
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."

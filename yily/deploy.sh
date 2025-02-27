@@ -14,7 +14,6 @@ show_help() {
   -p, --backend-port <端口>      反代 Emby 前端端口 (默认: 空)
   -f, --backend-http-frontend    反代 Emby 使用 HTTP 作为前端访问 (默认: 否)
   -b, --backend-http-backend     反代 Emby 使用 HTTP 连接后端 (默认: 否)
-  -t, --enable-streaming         启用 Emby 后端推流支持 (默认: 否)
   -s, --no-tls                   禁用 TLS (默认: 否)
   -h, --help                     显示帮助信息
 EOF
@@ -28,11 +27,14 @@ frontend_port="443"
 backend_port=""
 backend_http_backend="no"
 backend_http_frontend="no"
-enable_streaming="no"
 no_tls="no"
+enable_stream_backend="no"
+stream_count=0
+declare -a stream_backend_urls
+declare -a stream_protocols
 
 # 使用 `getopt` 解析参数
-TEMP=$(getopt -o y:r:P:p:bfsth --long you-domain:,r-domain:,frontend-port:,backend-port:,backend-http-frontend,backend-http-backend,enable-streaming,no-tls,help -n "$(basename "$0")" -- "$@")
+TEMP=$(getopt -o y:r:P:p:bfsh --long you-domain:,r-domain:,frontend-port:,backend-port:,backend-http-frontend,backend-http-backend,no-tls,help -n "$(basename "$0")" -- "$@")
 
 if [ $? -ne 0 ]; then
     echo "参数解析失败，请检查输入的参数。"
@@ -49,7 +51,6 @@ while true; do
         -p|--backend-port) backend_port="$2"; shift 2 ;;
         -b|--backend-http-backend) backend_http_backend="yes"; shift ;;
         -f|--backend-http-frontend) backend_http_frontend="yes"; shift ;;
-        -t|--enable-streaming) enable_streaming="yes"; shift ;;
         -s|--no-tls) no_tls="yes"; shift ;;
         -h|--help) show_help; shift ;;
         --) shift; break ;;
@@ -63,7 +64,28 @@ if [[ -z "$you_domain" || -z "$r_domain" ]]; then
     echo "请按提示输入参数，或直接按 Enter 使用默认值"
     read -p "你的域名或 IP [默认: you.example.com]: " input_you_domain
     read -p "反代 Emby 的域名 [默认: backend.example.com]: " input_r_domain
-    read -p "是否启用 Emby 后端推流支持? (yes/no) [默认: no]: " input_enable_streaming
+    read -p "是否给 Emby 后端启用推流? (yes/no) [默认: no]: " input_enable_stream_backend
+    if [[ "${input_enable_stream_backend:-no}" == "yes" ]]; then
+        while true; do
+            read -p "请输入推流地址数量 (请输入数字，例如 1, 2, 3): " input_stream_count
+            if [[ "$input_stream_count" =~ ^[0-9]+$ && "$input_stream_count" -gt 0 ]]; then
+                stream_count="$input_stream_count"
+                break
+            else
+                echo "请输入有效的数字（大于 0）！"
+            fi
+        done
+        for ((i=1; i<=stream_count; i++)); do
+            read -p "请输入第 $i 个推流地址 (例如: stream$i.example.com:8080): " input_stream_url
+            stream_backend_urls[$i-1]="$input_stream_url"
+            read -p "第 $i 个推流地址是否使用 HTTP 反向代理? (yes/no) [默认: no, 使用 HTTPS]: " input_stream_protocol
+            if [[ "${input_stream_protocol:-no}" == "yes" ]]; then
+                stream_protocols[$i-1]="http"
+            else
+                stream_protocols[$i-1]="https"
+            fi
+        done
+    fi
     read -p "前端访问端口 [默认: 443]: " input_frontend_port
     read -p "反代 Emby 前端端口 [默认: 空]: " input_backend_port
     read -p "是否使用 HTTP 连接反代 Emby 后端? (yes/no) [默认: no]: " input_backend_http_backend
@@ -72,7 +94,7 @@ if [[ -z "$you_domain" || -z "$r_domain" ]]; then
 
     you_domain="${input_you_domain:-you.example.com}"
     r_domain="${input_r_domain:-backend.example.com}"
-    enable_streaming="${input_enable_streaming:-no}"
+    enable_stream_backend="${input_enable_stream_backend:-no}"
     frontend_port="${input_frontend_port:-443}"
     backend_port="${input_backend_port}"
     backend_http_backend="${input_backend_http_backend:-no}"
@@ -90,7 +112,13 @@ echo "📌 你的域名: ${you_domain}"
 echo "🖥️ 前端访问端口: ${frontend_port}"
 echo "🔄 反代 Emby 的域名: ${r_domain}"
 echo "🎯 反代 Emby 前端端口: ${backend_port:-未指定}"
-echo "📡 启用 Emby 后端推流支持: $( [[ "$enable_streaming" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
+echo "📡 是否启用 Emby 后端推流: $( [[ "$enable_stream_backend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
+if [[ "$enable_stream_backend" == "yes" ]]; then
+    echo "🚀 推流地址数量: $stream_count"
+    for ((i=0; i<stream_count; i++)); do
+        echo "   - 推流地址 $((i+1)): ${stream_protocols[$i]}://${stream_backend_urls[$i]:-未指定}"
+    done
+fi
 echo "🔗 使用 HTTP 连接反代 Emby 后端: $( [[ "$backend_http_backend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 echo "🛠️ 使用 HTTP 连接反代 Emby 前端: $( [[ "$backend_http_frontend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 echo "🔒 禁用 TLS: $( [[ "$no_tls" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
@@ -149,7 +177,7 @@ fi
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/yily/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xinyily/nginx-reverse-emby/main/nginx.conf
 
 # 生成合并的配置文件
 config_file="$you_domain.conf"
@@ -224,6 +252,31 @@ server {
         proxy_read_timeout 60s;
     }
 
+    # 后端推流（如果启用）
+EOF
+
+# 动态添加多个推流地址的 location 块
+if [[ "$enable_stream_backend" == "yes" && "$stream_count" -gt 0 ]]; then
+    for ((i=0; i<stream_count; i++)); do
+        cat >> "$config_file" << EOF
+    location /stream$((i+1)) {
+        proxy_pass ${stream_protocols[$i]}://${stream_backend_urls[$i]};
+        proxy_set_header Host \$proxy_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+EOF
+    done
+else
+    echo "# Stream backend not enabled" >> "$config_file"
+fi
+
+# 添加重定向处理
+cat >> "$config_file" << EOF
     # 处理重定向
     location @handle_redirect {
         set \$saved_redirect_location '\$upstream_http_location';
@@ -236,22 +289,6 @@ server {
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
     }
-
-    $( [[ "$enable_streaming" == "yes" ]] && cat << 'STREAMING' || echo "# Streaming disabled")
-    # 后端：Emby 推流支持
-    location ~ ^/emby/videos/(.*)/stream {
-        proxy_pass $( [[ "$backend_http_backend" == "yes" ]] && echo "http" || echo "https" )://$r_domain${backend_port:+:$backend_port}/emby/videos/\$1/stream;
-        proxy_set_header Host \$proxy_host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_http_version 1.1;
-        proxy_buffering off;  # 禁用缓冲以支持实时流
-        proxy_cache off;      # 禁用缓存
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 300s;  # 增加超时时间以支持长连接
-        proxy_read_timeout 300s;
-    }
-STREAMING
 }
 EOF
 

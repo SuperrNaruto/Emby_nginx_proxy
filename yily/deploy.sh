@@ -177,7 +177,7 @@ fi
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xinyily/Emby_nginx_proxy/main/yily/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xiyily/Emby_nginx_proxy/refs/heads/main/yily/nginx.conf
 
 # 生成合并的配置文件
 config_file="$you_domain.conf"

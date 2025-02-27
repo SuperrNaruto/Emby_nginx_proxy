@@ -193,12 +193,6 @@ else
     echo "Nginx 已安装，跳过安装步骤。"
 fi
 
-# 确保 /etc/nginx/ 目录存在
-if [[ ! -d "/etc/nginx" ]]; then
-    echo "创建 /etc/nginx/ 目录..."
-    mkdir -p /etc/nginx
-fi
-
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
 curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/xinyily/nginx-reverse-emby/main/yily/nginx.conf

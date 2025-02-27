@@ -2,30 +2,34 @@
 
 set -e
 
-# Display help information
+# 显示帮助信息
 show_help() {
     cat << EOF
-Usage: $(basename "$0") [options]
+用法: $(basename "$0") [选项]
 
-Options:
-  -y, --you-domain <domain>         Your frontend domain or IP (e.g., example.com)
-  -P, --you-frontend-port <port>    Your frontend access port (default: 443)
-  -s, --no-tls                     Disable TLS (default: no)
-  -h, --help                       Display this help message
+选项:
+  -y, --you-domain <域名>        你的前端主站域名 (例如: example.com)
+  -P, --you-frontend-port <端口>  你的前端访问端口 (默认: 443)
+  -f, --r-http-frontend          反代 Emby 前端使用 HTTP (默认: 否)
+  -b, --r-http-backend           反代 Emby 后端使用 HTTP (默认: 否)
+  -s, --no-tls                   禁用 TLS (默认: 否)
+  -h, --help                     显示帮助信息
 EOF
     exit 0
 }
 
-# Initialize variables
+# 初始化变量
 you_domain=""
 you_frontend_port="443"
+r_http_backend="no"
+r_http_frontend="no"
 no_tls="no"
 backend_domains=()
 
-# Parse command-line arguments
-TEMP=$(getopt -o y:P:sh --long you-domain:,you-frontend-port:,no-tls,help -n "$(basename "$0")" -- "$@")
+# 使用 `getopt` 解析参数
+TEMP=$(getopt -o y:P:bfsh --long you-domain:,you-frontend-port:,r-http-frontend,r-http-backend,no-tls,help -n "$(basename "$0")" -- "$@")
 if [ $? -ne 0 ]; then
-    echo "Failed to parse parameters. Check your input."
+    echo "参数解析失败，请检查输入的参数。"
     exit 1
 fi
 
@@ -35,72 +39,71 @@ while true; do
     case "$1" in
         -y|--you-domain) you_domain="$2"; shift 2 ;;
         -P|--you-frontend-port) you_frontend_port="$2"; shift 2 ;;
+        -b|--r-http-backend) r_http_backend="yes"; shift ;;
+        -f|--r-http-frontend) r_http_frontend="yes"; shift ;;
         -s|--no-tls) no_tls="yes"; shift ;;
-        -h|--help) show_help ;;
+        -h|--help) show_help; shift ;;
         --) shift; break ;;
-        *) echo "Error: Unknown parameter $1"; exit 1 ;;
+        *) echo "错误: 未知参数 $1"; exit 1 ;;
     esac
 done
 
-# Interactive mode if required parameters are missing
+# 交互模式 (如果未提供必要参数)
 if [[ -z "$you_domain" ]]; then
-    echo -e "\n--- Interactive Mode: Configure Reverse Proxy ---"
-    echo "Please enter the parameters as prompted, or press Enter for defaults."
-    read -p "Your frontend domain or IP [default: you.example.com]: " input_you_domain
-    read -p "Your frontend access port [default: 443]: " input_you_frontend_port
-    read -p "Disable TLS? (yes/no) [default: no]: " input_no_tls
+    echo -e "\n--- 交互模式: 配置反向代理 ---"
+    echo "请按提示输入参数，或直接按 Enter 使用默认值"
+    read -p "你的前端主站域名 [默认: you.example.com]: " input_you_domain
+    read -p "你的前端访问端口 [默认: 443]: " input_you_frontend_port
+    read -p "是否使用 HTTP 连接反代 Emby 后端? (yes/no) [默认: no]: " input_r_http_backend
+    read -p "是否使用 HTTP 连接反代 Emby 前端? (yes/no) [默认: no]: " input_r_http_frontend
+    read -p "是否禁用 TLS? (yes/no) [默认: no]: " input_no_tls
 
+    # 赋值默认值
     you_domain="${input_you_domain:-you.example.com}"
     you_frontend_port="${input_you_frontend_port:-443}"
+    r_http_backend="${input_r_http_backend:-no}"
+    r_http_frontend="${input_r_http_frontend:-no}"
     no_tls="${input_no_tls:-no}"
 fi
 
-# Prompt for number of backend streaming servers
-while true; do
-    read -p "How many backend streaming servers do you want to configure? (Enter a number, or 0 to skip): " num_backends
-    if [[ "$num_backends" =~ ^[0-9]+$ ]]; then
-        break
-    else
-        echo "Please enter a valid number."
-    fi
-done
+# 询问后端推流服务器数量
+echo -e "\n--- 配置 Emby 后端推流服务器 ---"
+read -p "请输入后端推流服务器的数量 (默认: 0): " backend_count
+backend_count="${backend_count:-0}"
 
-# Collect backend domains if num_backends > 0
-if [[ "$num_backends" -gt 0 ]]; then
-    echo -e "\n--- Configure Backend Streaming Servers ---"
-    for ((i=1; i<=num_backends; i++)); do
-        while true; do
-            read -p "Enter domain for backend streaming server #$i (e.g., stream$i.example.com): " backend_domain
-            if [[ -n "$backend_domain" ]]; then
-                backend_domains+=("$backend_domain")
-                break
-            else
-                echo "Domain cannot be empty. Please enter a valid domain."
-            fi
-        done
+if [[ "$backend_count" -gt 0 ]]; then
+    for ((i=1; i<=backend_count; i++)); do
+        read -p "请输入第 $i 个后端推流服务器域名 (例如: backend$i.example.com): " backend_domain
+        if [[ -n "$backend_domain" ]]; then
+            backend_domains+=("$backend_domain")
+        else
+            echo "警告: 未输入有效的域名，跳过此服务器。"
+        fi
     done
 fi
 
-# Output configuration summary
+# 美化输出配置信息
 protocol=$( [[ "$no_tls" == "yes" ]] && echo "http" || echo "https" )
 url="${protocol}://${you_domain}:${you_frontend_port}"
 
-echo -e "\n------ Configuration Summary ------"
-echo "🌍 Frontend Access URL: ${url}"
-echo "📌 Frontend Domain: ${you_domain}"
-echo "🖥️ Frontend Port: ${you_frontend_port}"
-echo "🔒 Disable TLS: $( [[ "$no_tls" == "yes" ]] && echo "✅ Yes" || echo "❌ No" )"
+echo -e "\n------ 配置信息 ------"
+echo "🌍 前端访问地址: ${url}"
+echo "📌 前端主站域名: ${you_domain}"
+echo "🖥️ 前端访问端口: ${you_frontend_port}"
+echo "🔗 使用 HTTP 连接反代 Emby 后端: $( [[ "$r_http_backend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
+echo "🛠️ 使用 HTTP 连接反代 Emby 前端: $( [[ "$r_http_frontend" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
+echo "🔒 禁用 TLS: $( [[ "$no_tls" == "yes" ]] && echo "✅ 是" || echo "❌ 否" )"
 if [[ ${#backend_domains[@]} -gt 0 ]]; then
-    echo "🔄 Backend Streaming Servers:"
+    echo "🔄 后端推流服务器域名:"
     for domain in "${backend_domains[@]}"; do
-        echo "   - ${domain}"
+        echo "  - $domain"
     done
 else
-    echo "🔄 No backend streaming servers configured."
+    echo "🔄 后端推流服务器: 未配置"
 fi
 echo "----------------------"
 
-# Dependency check function (unchanged from original)
+# 检查依赖 (保持原逻辑不变)
 check_dependencies() {
     if [[ ! -f '/etc/os-release' ]]; then
         echo "error: Don't use outdated Linux distributions."
@@ -122,152 +125,94 @@ check_dependencies() {
 }
 check_dependencies
 
-# Install Nginx if not present (unchanged from original)
-echo "Checking if Nginx is installed..."
+# 检查并安装 Nginx (保持原逻辑不变)
+echo "检查 Nginx 是否已安装..."
 if ! command -v nginx &> /dev/null; then
-    echo "Nginx not installed, installing..."
-    # [Installation logic remains the same as in your original script]
-    # Omitted for brevity, but include it as is
+    echo "Nginx 未安装，正在安装..."
+    # 原安装逻辑保持不变，此处省略以节省篇幅
 else
-    echo "Nginx already installed, skipping installation."
+    echo "Nginx 已安装，跳过安装步骤。"
 fi
 
-# Generate Nginx configuration
-echo "Generating Nginx configuration..."
-config_file="/etc/nginx/conf.d/${you_domain}.conf"
-cat > "$config_file" << EOF
-server {
-    listen ${you_frontend_port}${no_tls == "yes" && " " || " ssl"};
-    listen [::]:${you_frontend_port}${no_tls == "yes" && " " || " ssl"};
-    http2 on;
+# 下载并复制 nginx.conf
+echo "下载并复制 nginx 配置文件..."
+curl -o /etc/nginx/nginx.conf https://github.com/xiyily/Emby_nginx_proxy/main/yily/nginx.conf
 
-    server_name ${you_domain};
+you_domain_config="$you_domain"
+download_domain_config="p.example.com"
 
-    ${no_tls == "yes" && "" || "ssl_certificate /etc/nginx/certs/${you_domain}/cert;\n    ssl_certificate_key /etc/nginx/certs/${you_domain}/key;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    ssl_ciphers TLS13_AES_128_GCM_SHA256:TLS13_AES_256_GCM_SHA384:TLS13_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305;\n    ssl_prefer_server_ciphers on;"}
+# 如果 $no_tls 选择使用 HTTP，则选择下载对应的模板
+if [[ "$no_tls" == "yes" ]]; then
+    you_domain_config="$you_domain.$you_frontend_port"
+    download_domain_config="p.example.com.no_tls"
+fi
 
-    resolver 1.1.1.1 223.5.5.5 8.8.8.8 valid=60s;
-    resolver_timeout 5s;
+# 下载并创建配置文件
+echo "下载并创建 $you_domain_config 配置文件..."
+curl -o "$you_domain_config.conf" "https://github.com/xiyily/Emby_nginx_proxy/tree/main/yily/conf.d/$download_domain_config.conf"
 
-    client_header_timeout 1h;
-    keepalive_timeout 30m;
-    client_header_buffer_size 8k;
+# 修改端口
+if [[ -n "$you_frontend_port" ]]; then
+    sed -i "s/443/$you_frontend_port/g" "$you_domain_config.conf"
+fi
 
-    # Backend streaming servers
-    location ~ ^/backstream/([^/]+) {
-        set \$website \$1;
-        rewrite ^/backstream/([^/]+)(/.+)$ \$2 break;
-        proxy_pass https://\$website;
-        resolver 1.1.1.1 223.5.5.5 8.8.8.8;
+# 如果 r_http_frontend 使用 HTTP，替换前端协议
+if [[ "$r_http_frontend" == "yes" ]]; then
+    sed -i "s/https:\/\/emby.example.com/http:\/\/emby.example.com/g" "$you_domain_config.conf"
+fi
 
-        proxy_set_header Host \$proxy_host;
-        proxy_http_version 1.1;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_ssl_server_name on;
+# 替换域名信息 (前端主站)
+sed -i "s/p.example.com/$you_domain/g" "$you_domain_config.conf"
+sed -i "s/emby.example.com/${backend_domains[0]:-emby.example.com}/g" "$you_domain_config.conf"
 
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header Forwarded \$proxy_add_forwarded;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Port \$server_port;
+# 如果 r_http_backend 使用 HTTP，替换后端协议
+if [[ "$r_http_backend" == "yes" ]]; then
+    sed -i "s/https:\/\/\$website/http:\/\/\$website/g" "$you_domain_config.conf"
+fi
 
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
+# 移动配置文件
+echo "移动 $you_domain_config.conf 到 /etc/nginx/conf.d/"
+if [[ "$OS_NAME" == "ubuntu" ]]; then
+    rsync -av "$you_domain_config.conf" /etc/nginx/conf.d/
+else
+    mv -f "$you_domain_config.conf" /etc/nginx/conf.d/
+fi
 
-    # Frontend main site
-    location / {
-        proxy_pass https://${backend_domains[0]:-emby.example.com};
-        resolver 1.1.1.1 223.5.5.5 8.8.8.8;
-
-        proxy_set_header Host \$proxy_host;
-        proxy_http_version 1.1;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_ssl_server_name on;
-
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header Forwarded \$proxy_add_forwarded;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Port \$server_port;
-
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-
-        proxy_redirect ~^(https?)://([^:/]+(?::\d+)?)(/.+)$ \$scheme://\$server_name:\$server_port/backstream/\$2\$3;
-        set \$rediret_scheme \$1;
-        set \$rediret_host \$2;
-        sub_filter \$proxy_host \$host;
-        sub_filter '\$rediret_scheme://\$rediret_host' '\$scheme://\$server_name:\$server_port/backstream/\$rediret_host';
-        sub_filter_once off;
-        proxy_intercept_errors on;
-        error_page 307 = @handle_redirect;
-    }
-
-    location @handle_redirect {
-        set \$saved_redirect_location '\$upstream_http_location';
-        proxy_pass \$saved_redirect_location;
-        resolver 1.1.1.1 223.5.5.5 8.8.8.8;
-
-        proxy_set_header Host \$proxy_host;
-        proxy_http_version 1.1;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_ssl_server_name on;
-
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header Forwarded \$proxy_add_forwarded;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Port \$server_port;
-
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-}
-EOF
-
-# TLS setup (unchanged from original, but simplified here)
+# TLS 配置 (保持原逻辑不变)
 if [[ "$no_tls" != "yes" ]]; then
     ACME_SH="$HOME/.acme.sh/acme.sh"
-    echo "Checking acme.sh..."
+    echo "检查 acme.sh 是否已安装..."
     if [[ ! -f "$ACME_SH" ]]; then
-        echo "Installing acme.sh..."
+        echo "acme.sh 未安装，正在安装..."
         apt install -y socat cron
         curl https://get.acme.sh | sh
         "$ACME_SH" --upgrade --auto-upgrade
         "$ACME_SH" --set-default-ca --server letsencrypt
+    else
+        echo "acme.sh 已安装，跳过安装步骤。"
     fi
 
     if ! "$ACME_SH" --info -d "$you_domain" | grep -q RealFullChainPath; then
-        echo "Issuing ECC certificate..."
+        echo "ECC 证书未申请，正在申请..."
         mkdir -p "/etc/nginx/certs/$you_domain"
         "$ACME_SH" --issue -d "$you_domain" --standalone --keylength ec-256 || {
-            echo "Certificate issuance failed!"
-            rm -f "$config_file"
+            echo "证书申请失败，请检查错误信息！"
+            rm -f "/etc/nginx/conf.d/$you_domain_config.conf"
             exit 1
         }
+    else
+        echo "ECC 证书已申请，跳过申请步骤。"
     fi
 
-    echo "Installing certificate..."
+    echo "安装证书..."
     "$ACME_SH" --install-cert -d "$you_domain" --ecc \
         --fullchain-file "/etc/nginx/certs/$you_domain/cert" \
         --key-file "/etc/nginx/certs/$you_domain/key" \
         --reloadcmd "nginx -s reload" --force
+    echo "证书安装完成！"
 fi
 
-# Reload Nginx
-echo "Reloading Nginx..."
+echo "重新加载 Nginx..."
 nginx -s reload
 
-echo "Reverse proxy setup complete!"
+echo "反向代理设置完成！"

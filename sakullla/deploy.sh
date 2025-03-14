@@ -178,7 +178,7 @@ fi
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/yilyOu/Emby_nginx_proxy/main/sakullla/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/sakullla/nginx.conf
 
 you_domain_config="$you_domain"
 download_domain_config="p.example.com"
@@ -191,7 +191,7 @@ fi
 
 # 下载并复制 p.example.com.conf 并修改
 echo "下载并创建 $you_domain_config 配置文件..."
-curl -o "$you_domain_config.conf" "https://raw.githubusercontent.com/yilyOu/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
+curl -o "$you_domain_config.conf" "https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/sakullla/conf.d/$download_domain_config.conf"
 
 # 如果 you_frontend_port 不为空， 则替换端口
 if [[ -n "$you_frontend_port" ]]; then

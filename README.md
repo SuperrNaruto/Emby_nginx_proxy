@@ -26,7 +26,7 @@
 | ---- | ------------------- | --------------- | ------------- |
 | `-y` | `--you-domain <域名>` | 你的域名或 IP 地址（必填） | `example.com` |
 | `-r` | `--r-domain <域名>`   | 反代 Emby 的前端域名（必填） | `front.com` |
-| `-t` | `--backend-domain <域名> `   | 反代 Emby 的播放后端域名（必填） | `backend.com` |
+| `-t` | `--backend-domain <域名> `   | 反代 Emby 的后端域名（必填） | `backend.com` |
 ### 可选参数
 
 | 参数   | 长格式参数                      | 说明                              | 示例                 |

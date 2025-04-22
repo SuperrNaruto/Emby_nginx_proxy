@@ -183,7 +183,7 @@ fi
 
 # 下载并复制 nginx.conf
 echo "下载并复制 nginx 配置文件..."
-curl -o /etc/nginx/nginx.conf https://github.com/YilyOu/Emby_nginx_proxy/raw/main/nginx.conf
+curl -o /etc/nginx/nginx.conf https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/nginx.conf
 
 you_domain_config="$you_domain"
 download_domain_config="p.example.com"

@@ -2,7 +2,9 @@
 
 ### 作者Github [@sakullla](https://github.com/sakullla/nginx-reverse-emby) 
 
-#### >> [单域名反向代理](https://github.com/xiyily/Emby_nginx_proxy/tree/main/sakullla) <<
+#### 此页面脚本支持前后端播放分离
+
+#### >> [单域名反向代理](https://github.com/YilyOu/Emby_nginx_proxy/tree/main/sakullla) <<
 
 ## 项目简介
 
@@ -10,7 +12,7 @@
 
 ### 功能特性
 
-- 支持单个域名的反代，并可实现 307 重定向。对于 301 和 302 的重定向。
+- 支持前后端播放分离域名的反代，并可实现 307 重定向。对于 301 和 302 的重定向。
 - 代理后的 Emby 服务器兼容 HTTP/1.1、HTTP/2、HTTP/3，支持 IPv4 和 IPv6 访问。
 - 允许代理多个 Emby 实例。
 
@@ -45,13 +47,13 @@
 #### 通过 `curl` 在线执行（直接传参，推荐）
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/sakullla/deploy.sh | bash -s -- -y yourdomain.com -r backend.com
+curl -sSL https://github.com/YilyOu/Emby_nginx_proxy/heads/main/deploy.sh | bash -s -- -y yourdomain.com -r front.com -t backend.com
 ```
 
 #### 通过 `curl` 在线执行（交互模式）
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/sakullla/deploy.sh)
+bash <(curl -sSL https://github.com/YilyOu/Emby_nginx_proxy/heads/main/deploy.sh)
 ```
 
 #### 本地运行（需下载并授予权限）
@@ -59,7 +61,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/
 ```bash
 curl -O https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/sakullla/deploy.sh
 chmod +x deploy.sh
-./deploy.sh -y example.com -r backend.com -P 443 -p 8096 -f -b -s
+./deploy.sh -y example.com -r front.com -t backend.com -P 443 -p 8096 -f -b -s
 ```
 
 ## 依赖项

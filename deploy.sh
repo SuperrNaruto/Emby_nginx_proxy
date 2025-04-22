@@ -270,10 +270,10 @@ if [[ "$no_tls" != "yes" ]]; then
     echo "证书安装完成！"
 fi
 
-echo "启动 Nginx 服务..."
-systemctl start nginx
-
 echo "重新加载 Nginx..."
 nginx -s reload
+
+echo "启动 Nginx 服务..."
+systemctl start nginx
 
 echo "反向代理设置完成！"

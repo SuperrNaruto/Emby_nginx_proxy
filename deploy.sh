@@ -24,7 +24,7 @@ EOF
 # 初始化变量
 you_domain=""
 r_domain=""
-backend_domain="backend.example.com"
+backend_domain=""
 you_frontend_port="443"
 r_frontend_port=""
 r_http_backend="no"

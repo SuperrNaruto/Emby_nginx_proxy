@@ -2,9 +2,7 @@
 
 ### 作者Github [@sakullla](https://github.com/sakullla/nginx-reverse-emby) 
 
-## 项目简介
-
-`nginx-reverse-emby` 是一个用于配置 Nginx 反向代理 Emby 服务器的脚本，适用于 Emby 公费服或机场服。它支持 HTTP 和 HTTPS 连接，并允许自定义前端和后端端口。
+#### >> [单域名反向代理](https://github.com/YilyOu/Emby_nginx_proxy) <<
 
 ### 功能特性
 

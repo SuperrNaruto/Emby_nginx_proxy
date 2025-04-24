@@ -2,7 +2,7 @@
 
 ### 作者Github [@sakullla](https://github.com/sakullla/nginx-reverse-emby) 
 
-#### >> [单域名反向代理](https://github.com/YilyOu/Emby_nginx_proxy) <<
+#### >> [前后端域名反向代理](https://github.com/YilyOu/Emby_nginx_proxy) <<
 
 ### 功能特性
 

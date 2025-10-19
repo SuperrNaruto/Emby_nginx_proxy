@@ -8,7 +8,7 @@
 # 下载运行
 1. 下载脚本
 ```bash
-wget https://raw.githubusercontent.com/YilyOu/Emby_nginx_proxy/main/Proxy_Louis.sh
+wget https://raw.githubusercontent.com/xiikiss/Emby_nginx_proxy/main/Proxy_Louis.sh
 ```
 > 注意：可能存在重复下载文件，需要手动删除文件
 
